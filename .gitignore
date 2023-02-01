@@ -1,0 +1,5 @@
+*.ckp
+*.lnk
+my_test.py
+.idea/
+*.png
