@@ -8,7 +8,7 @@ class VGGnet(nn.Module):
         super(VGGnet, self).__init__()
 
         # import VGG16 model
-        model = models.vgg16(pretrained=True)
+        model = models.vgg19_bn(pretrained=True)
 
         # import feature extracter
         self.features = model.features
@@ -21,17 +21,20 @@ class VGGnet(nn.Module):
 
         # refactor classifier
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 128),  # nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Linear(128, num_classes)  # nn.Linear(1024, num_classes)
+            nn.Flatten(),
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5, inplace=False),
+            nn.Linear(4096, 1024),  # nn.Linear(1024, 1024),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5, inplace=False),
+            nn.Linear(1024, num_classes)  # nn.Linear(1024, num_classes)
         )
 
     def forward(self, x):
         x = self.features(x)
         x = self.avgpool(x)
-        x = x.view(x.size(0), 512 * 7 * 7)
+        #x = x.view(x.size(0), 512 * 7 * 7)
         out = self.classifier(x)
         return out
 

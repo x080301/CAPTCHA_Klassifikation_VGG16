@@ -25,9 +25,13 @@ class CAPTCHADataset(Dataset):
                 transforms.RandomRotation(15),
                 transforms.CenterCrop(_size),  # 防止旋转后边界出现黑框部分
 
+                transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+
                 transforms.ToTensor(),
                 transforms.Normalize(mean=_train_mean,
-                                     std=_train_std)
+                                     std=_train_std),
+                transforms.RandomErasing(),
+                transforms.GaussianBlur(5)
             ])
         else:  # they can be different.
             self.transform = transforms.Compose([
@@ -60,7 +64,7 @@ class CAPTCHADataset(Dataset):
 
 
 if __name__ == '__main__':
-    train_dataset = pd.read_csv('data_train.csv', sep=';')
+    train_dataset = pd.read_csv('test.csv', sep=';')
     # print(train_dataset.iloc[1,0])
 
     db = CAPTCHADataset(train_dataset, 'train')
@@ -68,4 +72,5 @@ if __name__ == '__main__':
     # print(loader)
 
     for x, y in loader:
+        print(y)
         print(x)

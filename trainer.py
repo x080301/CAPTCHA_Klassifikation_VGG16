@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 
 
-class VGGTrainer:
+class Trainer:
 
     def __init__(self,
                  model,  # Model to be trained.
@@ -18,7 +18,10 @@ class VGGTrainer:
                  ):
         self._model = model
         self._crit = crit
+
         self._optim = optim
+        self._lr = optim.state_dict()['param_groups'][0]['lr']
+
         self._train_dl = train_dl
         self._val_test_dl = val_dl
         self._cuda = cuda
@@ -104,8 +107,13 @@ class VGGTrainer:
 
             # perform a validation step
             loss = 0
-            pred_list = []
-            y_list = []
+
+            pred_list = torch.empty(0, 12)
+            y_list = torch.empty(0, 12)
+            if self._cuda:
+                pred_list = pred_list.cuda()
+                y_list = y_list.cuda()
+
             for x, y in tqdm(valid_dl):
                 # transfer the batch to the gpu if given
                 if self._cuda:
@@ -116,15 +124,16 @@ class VGGTrainer:
                 loss += loss_batch
 
                 # save the predictions and the labels for each batch
-                y_list = np.append(y_list, y.cpu())
+                y_list = torch.cat((y_list, y), 0)
+                pred_list = torch.cat((pred_list, predictions), 0)
 
-                pred_list = np.append(pred_list, np.around(predictions.cpu()))
+        _, pred_list = torch.max(pred_list, 1)
+        pred_list = torch.nn.functional.one_hot(pred_list)
 
         # calculate the average loss and average metrics of your choice. You might want to calculate these
         # metrics in designated functions
         loss = loss / len(valid_dl)
-        accuracy = accuracy_score(y_list, pred_list)
-        print("accuracy = ", accuracy)
+        accuracy = accuracy_score(y_list.cpu(), pred_list.cpu())
 
         # return the loss and print the calculated metrics
         return loss, accuracy
@@ -138,59 +147,59 @@ class VGGTrainer:
         epoch_id = 0
 
         while True:
-            print("\nepoch: ", epoch_id)
 
-            '''
-            if epoch_id % 25 == 0:
+            print("\nepoch: ", epoch_id)
+            epoch_id += 1
+
+            if epoch_id % 15 == 0:
                 for param_group in self._optim.param_groups:
-                    if param_group['lr']>0.0001:
+                    if param_group['lr'] > self._lr * 0.05:
                         param_group['lr'] = param_group['lr'] * 0.5
-            '''
 
             # stop by epoch number
             if epoch_id >= epochs:
                 break
-
             # train for a epoch and then calculate the loss and metrics on the validation set
             train_loss = self.train_epoch()
             print("train loss = ", train_loss)
+
             valid_loss, accuracy = self.val_test()
             print("valid_loss = ", valid_loss)
+            print("accuracy = ", accuracy)
 
-            # append the losses to the respective lists
+            '''# append the losses to the respective lists
             train_losses = np.append(train_losses, train_loss.cpu().detach())
             valid_losses = np.append(valid_losses, valid_loss.cpu().detach())
-            accuracies = np.append(accuracies, accuracy)
+            accuracies = np.append(accuracies, accuracy)'''
 
             # use the save_checkpoint function to save the model (can be restricted to epochs with improvement)
-            if epoch_id % 10 == 0:
-                self.save_checkpoint(epoch_id, accuracy)
+            self.save_checkpoint(epoch_id, accuracy)
 
             # check whether early stopping should be performed using the early stopping criterion and stop if so
-
-            epoch_id += 1
 
 
 if __name__ == '__main__':
     from Model_VGG16 import VGGnet
     import pandas as pd
     from data import CAPTCHADataset
+    from Model_ResNet import ResNet
 
     train_dataset = pd.read_csv('data_train.csv', sep=';')
     train_dl = CAPTCHADataset(train_dataset, 'train')
 
     valid_dataset = pd.read_csv('data_valid.csv', sep=';')
-    valid_dl = CAPTCHADataset(train_dataset, 'valid')
+    valid_dl = CAPTCHADataset(valid_dataset, 'valid')
 
-    net = VGGnet(fine_tuning=True, num_classes=12)
+    # net = VGGnet(fine_tuning=True, num_classes=12)
+    net = ResNet(num_classes=12)
 
     # set up a suitable loss criterion (you can find a pre-implemented loss functions in t.nn)
     criterion = torch.nn.CrossEntropyLoss()
 
     # set up the optimizer (see t.optim)
-    optimizer = torch.optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08)  # lr=0.001
+    optimizer = torch.optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01)
 
     # create an object of type Trainer and set its early stopping criterion
-    trainer = VGGTrainer(net, criterion, optimizer, train_dl, valid_dl, cuda=True)
+    trainer = Trainer(net, criterion, optimizer, train_dl, valid_dl, cuda=True)
 
-    trainer.fit(20)
+    trainer.fit(100)
