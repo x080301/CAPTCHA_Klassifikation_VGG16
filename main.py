@@ -6,7 +6,7 @@ import torch
 from trainer import Trainer
 
 if __name__ == '__main__':
-    '''# VGG19
+    '''# Train VGG19
     train_dataset = pd.read_csv('data_train.csv', sep=';')
     train_dl = CAPTCHADataset(train_dataset, 'train')
 
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     trainer.fit(100)'''
 
-    '''# ResNet
+    '''# Train ResNet
     train_dataset = pd.read_csv('data_train.csv', sep=';')
     train_dl = CAPTCHADataset(train_dataset, 'train')
 
@@ -47,7 +47,8 @@ if __name__ == '__main__':
     trainer = Trainer(net, criterion, optimizer, train_dl, valid_dl, cuda=True)
 
     trainer.fit(100)'''
-    # VGG19
+    # VGG19 has better performance
+    # get results using VGG19
 
     test_dataset = pd.read_csv('data_test.csv', sep=';')
     test_dl = CAPTCHADataset(test_dataset, 'test')
