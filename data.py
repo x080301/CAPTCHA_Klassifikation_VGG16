@@ -6,7 +6,7 @@ import pandas as pd
 
 
 class CAPTCHADataset(Dataset):
-    def __init__(self, data, mode):  # TODO
+    def __init__(self, data, mode):
         super(CAPTCHADataset, self).__init__()
 
         self.data = data
@@ -50,15 +50,18 @@ class CAPTCHADataset(Dataset):
         if torch.is_tensor(index):
             index = index.tolist()
 
-        #
         image_dir = self.data.iloc[index, 0]
-        label = self.data.iloc[index, 1:]
-        label = torch.tensor(label, dtype=torch.long)
-
         # image_dir = os.path.join(os.path.split(os.path.abspath(__file__))[0], image_dir)
         image = imread(image_dir)
         image = image[:, :, 0:3]
         image = self.transform(image)
+
+        #
+        if self.mode == 'test':
+            label = self.data.iloc[index, 1]
+        else:
+            label = self.data.iloc[index, 1:]
+            label = torch.tensor(label, dtype=torch.long)
 
         return image, label
 

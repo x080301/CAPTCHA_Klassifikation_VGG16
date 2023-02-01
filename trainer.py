@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader
 from tqdm.autonotebook import tqdm
 import numpy as np
 from sklearn.metrics import accuracy_score
+import shutil
+import pandas as pd
 
 
 class Trainer:
@@ -148,10 +150,10 @@ class Trainer:
 
         while True:
 
-            print("\nepoch: ", epoch_id)
             epoch_id += 1
+            print("\nepoch: ", epoch_id)
 
-            if epoch_id % 15 == 0:
+            if epoch_id % 20 == 0:
                 for param_group in self._optim.param_groups:
                     if param_group['lr'] > self._lr * 0.05:
                         param_group['lr'] = param_group['lr'] * 0.5
@@ -177,10 +179,108 @@ class Trainer:
 
             # check whether early stopping should be performed using the early stopping criterion and stop if so
 
+    def fine_tune(self, epochs, checkpointfile, lr=0.0005):
+
+        self.restore_checkpoint(checkpointfile)
+
+        epoch_id = 0
+
+        for param_group in self._optim.param_groups:
+            param_group['lr'] = lr
+            self._lr = lr
+
+        while True:
+
+            epoch_id += 1
+            print("\nepoch: ", epoch_id)
+
+            if epoch_id % 20 == 0:
+                for param_group in self._optim.param_groups:
+                    if param_group['lr'] > self._lr * 0.05:
+                        param_group['lr'] = param_group['lr'] * 0.5
+
+            # stop by epoch number
+            if epoch_id >= epochs:
+                break
+            # train for a epoch and then calculate the loss and metrics on the validation set
+            train_loss = self.train_epoch()
+            print("train loss = ", train_loss)
+
+            valid_loss, accuracy = self.val_test()
+            print("valid_loss = ", valid_loss)
+            print("accuracy = ", accuracy)
+
+            '''# append the losses to the respective lists
+            train_losses = np.append(train_losses, train_loss.cpu().detach())
+            valid_losses = np.append(valid_losses, valid_loss.cpu().detach())
+            accuracies = np.append(accuracies, accuracy)'''
+
+            # use the save_checkpoint function to save the model (can be restricted to epochs with improvement)
+            self.save_checkpoint(epoch_id, accuracy)
+
+            # check whether early stopping should be performed using the early stopping criterion and stop if so
+
+    def test(self, checkpointfile):
+
+        self.restore_checkpoint(checkpointfile)
+        # set eval mode
+        self._model.eval()
+
+        test_dl = DataLoader(self._val_test_dl, batch_size=32, shuffle=True)
+
+        # disable gradient computation
+        with torch.no_grad():
+
+            # perform a testation step
+
+            pred_list = torch.empty(0, 12)
+            image_name_list = []
+            if self._cuda:
+                pred_list = pred_list.cuda()
+
+            for x, image_name in tqdm(test_dl):
+                # transfer the batch to the gpu if given
+                if self._cuda:
+                    x = x.cuda()
+
+                # predict
+                predictions = self._model(x)
+
+                # save the predictions and the labels for each batch
+                pred_list = torch.cat((pred_list, predictions), 0)
+
+                image_name = list(image_name)
+                image_name_list += image_name
+
+        pred_list = pred_list.cpu()
+
+        _, pred_label_list = torch.max(pred_list, 1)
+        labels = ['Bicycle', 'Bridge', 'Bus', 'Car', 'Chimney', 'Crosswalk', 'Hydrant', 'Motorcycle', 'Other',
+                  'Palm', 'Stair', 'Traffic Light']
+        column = [
+            'ImageName,Bicycle,Bridge,Bus,Car,Chimney,Crosswalk,Hydrant,Motorcycle,Other,Palm,Stair,Traffic,Light']
+        csv_data = []
+
+        for i in range(len(pred_label_list)):
+            pred_label = pred_label_list[i]
+            image_name = image_name_list[i]
+            prediction = pred_list[i, :]
+
+            prediction = prediction.numpy().tolist()
+            prediction = ','.join([str(x) for x in prediction])
+
+            csv_row = image_name + ',' + prediction
+            csv_data.append(csv_row)
+
+            pred_label = labels[pred_label]
+            shutil.copy('dataset/test/' + image_name, 'dataset/test_pre/' + pred_label + '/' + image_name)
+
+        test_csv = pd.DataFrame(columns=column, data=csv_data)
+        test_csv.to_csv('results_test.csv', index=False, sep=',')
+
 
 if __name__ == '__main__':
     from Model_VGG16 import VGGnet
-    import pandas as pd
     from data import CAPTCHADataset
     from Model_ResNet import ResNet
 

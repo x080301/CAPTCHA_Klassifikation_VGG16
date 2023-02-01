@@ -84,8 +84,20 @@ def get_mean_std(data_dir):
     return mean.div_(length), std.div_(length)
 
 
-if __name__ == "__main__":
-    writecsv('dataset/train_val', train_num_per_class=2000)
+def writecsv_test(data_dir):
+    column = ['filename;filename2']
 
-    #print(get_mean_std('dataset'))  # reslut: (tensor([0.4795, 0.4722, 0.4359]), tensor([0.1675, 0.1676, 0.1834]))
+    data_list = []
+    for file_name in os.listdir(data_dir):
+        data_row = data_dir + '/' + file_name + ';' + file_name
+        data_list.append(data_row)
+    test_csv = pd.DataFrame(columns=column, data=data_list)
+    test_csv.to_csv('data_test.csv', index=False)
+
+
+if __name__ == "__main__":
+    writecsv_test('dataset/test')
+    # writecsv('dataset/train_val', train_num_per_class=2000)
+
+    # print(get_mean_std('dataset'))  # reslut: (tensor([0.4795, 0.4722, 0.4359]), tensor([0.1675, 0.1676, 0.1834]))
     pass
